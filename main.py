@@ -1,37 +1,37 @@
 from City import City
 from helpers import (getDistanceBetweenTwoCities)
 
-# zmienna globalna przechowująca liczbę miast
-numberOfCities = 0;
 
 def main():
-    graph = generateGraphFromFile("bayg29.txt");
+    (numberOfCities, graph) = generateGraphFromFile("bayg29.txt")
     distanceDictionary = calculateDistancesBetweenCities(graph)
     greedyVoyagePath = getVoyagePath(graph[0], graph, distanceDictionary)
     # dystans, jaki trzeba pokonać na podstawie trasy wyliczonej za pomocą algorytmu zachłannego
     greedyVoyagePathDistance = 0
+    print("Path: ")
     for i in range(numberOfCities):
+        print(greedyVoyagePath[i].name)
         if i != numberOfCities - 1:
             greedyVoyagePathDistance += distanceDictionary[greedyVoyagePath[i].name
-            ][greedyVoyagePath[i + 1].name]
-    print(greedyVoyagePathDistance)
+                                                           ][greedyVoyagePath[i + 1].name]
+    print("Total length:", greedyVoyagePathDistance)
 
 
 # wygenerowanie grafu zawierającego miasta o współrzędnych podanych w pliku
 def generateGraphFromFile(filepath):
-    global numberOfCities
     cities = []
     f = open(filepath, "r", encoding="utf-8")
     # pobranie z 1. linii pliku liczby miast
-    numberOfCities = int(f.readline());
+    numberOfCities = int(f.readline())
     for line in f:
         dataOfCity = line.split()
         # pierwszy element to numer miasta, następnie współrzędne x i y
-        cities.append(City(int(dataOfCity[1]), int(dataOfCity[2])))
-    return cities
+        cities.append(City(dataOfCity[0], float(
+            dataOfCity[1]), float(dataOfCity[2])))
+    return (numberOfCities, cities)
 
 
-# metoda zwracająca słownik, który na każdej pozycji odpowiadającej miastu przetrzymuje słownik
+# funkcja zwracająca słownik, który na każdej pozycji odpowiadającej miastu przetrzymuje słownik
 # zawierający odległości od danego miasta do innych miast
 def calculateDistancesBetweenCities(graph):
     distanceDictionary = {}
@@ -39,7 +39,8 @@ def calculateDistancesBetweenCities(graph):
         localDictionary = {}
         for nearbyCity in graph:
             if city.name != nearbyCity.name:
-                localDictionary[nearbyCity.name] = getDistanceBetweenTwoCities(city, nearbyCity)
+                localDictionary[nearbyCity.name] = getDistanceBetweenTwoCities(
+                    city, nearbyCity)
         distanceDictionary[city.name] = localDictionary
 
     return distanceDictionary
@@ -55,8 +56,8 @@ def getVoyagePath(begginingCity, graph, distanceDictionary):
             break
         currentlyOptimalDistance = float('inf')  # infinity
         currentlyOptimalCity = None
+        # wyszukujemy najbliższe miasto, którego nie odwiedziliśmy
         for city in citiesArray:
-            # obliczamy dystans z ostatniego miasta, w którym byliśmy do miasta, które jest najbliżej
             distance = distanceDictionary[voyagePath[-1].name][city.name]
             if distance < currentlyOptimalDistance:
                 currentlyOptimalDistance = distance

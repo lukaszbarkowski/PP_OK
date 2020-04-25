@@ -1,7 +1,8 @@
 import uuid
 
+
 class City:
-    def __init__(self, x, y):
-        self.name = uuid.uuid4().hex
+    def __init__(self, name, x, y):
+        self.name = name
         self.x = x
         self.y = y
