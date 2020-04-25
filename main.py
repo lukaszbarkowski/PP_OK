@@ -1,13 +1,14 @@
+import static as static
+
 from City import City
-from helpers import (
-    getDistanceBetweenTwoCities
-)
+from helpers import (getDistanceBetweenTwoCities)
 
-numberOfCities = 1000
-
+#numberOfCities = 1000
+numberOfCities = 0;
 
 def main():
-    graph = generateGraph(numberOfCities)
+    #graph = generateGraph(numberOfCities)
+    graph = generateGraphFromFile("bayg29.txt");
     distanceDictionary = calculateDistancesBetweenCities(graph)
     greedyVoyagePath = getVoyagePath(graph[0], graph, distanceDictionary)
     greedyVoyagePathDistance = 0
@@ -18,12 +19,22 @@ def main():
     print(greedyVoyagePathDistance)
 
 
+def generateGraphFromFile(filepath):
+    f = open(filepath,"r", encoding = "utf-8")
+    global numberOfCities
+    numberOfCities = int(f.readline());
+    cities = []
+    for line in f:
+        dataOfCity = line.split()
+        #1. sign is number of city, then x, and y
+        cities.append(City(int(dataOfCity[1]),int(dataOfCity[2])))
+    return cities
+
 def generateGraph(n):
     cities = []
     for _ in range(n):
         cities.append(City())
     return cities
-
 
 def calculateDistancesBetweenCities(graph):
     distanceDictionary = {}
