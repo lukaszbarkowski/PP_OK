@@ -1,23 +1,146 @@
 from City import City
 from helpers import (getDistanceBetweenTwoCities)
+import math
+from random import randint, uniform
+from pprint import pprint
+population = []
+distanceDictionary = {}
+graph = []
 
 
 def main():
-    (numberOfCities, graph) = generateGraphFromFile("bayg29.txt")
+    global distanceDictionary
+    global graph
+    (numberOfCities, g) = generateGraphFromFile("bayg29.txt")
+    graph = g
     distanceDictionary = calculateDistancesBetweenCities(graph)
-    greedyVoyagePath = getVoyagePath(graph[0], graph, distanceDictionary)
-    # dystans, jaki trzeba pokonać na podstawie trasy wyliczonej za pomocą algorytmu zachłannego
-    greedyVoyagePathDistance = 0
-    print("Path: ")
-    for i in range(numberOfCities):
-        print(greedyVoyagePath[i].name)
-        if i != numberOfCities - 1:
-            greedyVoyagePathDistance += distanceDictionary[greedyVoyagePath[i].name
-                                                           ][greedyVoyagePath[i + 1].name]
-    print("Total length:", greedyVoyagePathDistance)
+    greedyVoyagePath = getGreedyVoyagePath(graph[0], graph, distanceDictionary)
+    greedyVoyagePath.append(graph[0])
+    greedyVoyagePathDistance = countVoyageLength(greedyVoyagePath)
+    cuckooSearch(graph, distanceDictionary)
+    print("Total greedy length:", greedyVoyagePathDistance)
 
+
+def cuckooSearch(graph, distanceDictionary):
+    global population
+    numberOfNests = len(graph)
+
+    abandonedNestsParameter = math.floor(numberOfNests - 1)
+
+    generations = 100
+
+    population = generatePopulation(graph, len(graph))
+
+    # tuple -> tuple with voyage at index 0 and distance at 1
+    population.sort(key=lambda tuple: tuple[1])
+    min = float('inf')
+    for i in range(generations):
+        res = cuckoo(abandonedNestsParameter)
+        if res < min:
+            min = res
+        print(i, min)
+    print("Total cuckoo lenght:", population[0][1])
+    # for i in population[0][0]:
+    #     print(i.name)
+
+
+def cuckoo(abandonedNestsParameter):
+    global population
+    pop = population.copy()
+    nest = pop[randint(0, len(pop)-1)]
+
+    if leviFlight() > 2:
+        nest = doubleBridgeMove(nest)
+    else:
+        nest = twoOptMove(nest)
+
+    randomNestIndex = randint(0, len(pop)-1)
+
+    if(population[randomNestIndex][1] > nest[1]):
+        population[randomNestIndex] = nest
+
+    abandonNests(abandonedNestsParameter)
+    population.sort(key=lambda tuple: tuple[1])
+    return population[0][1]
+
+
+def abandonNests(numberOfNests):
+    global population
+    global graph
+
+    goodNests = population[0:len(population)-numberOfNests]
+
+    newNests = generatePopulation(graph, numberOfNests)
+    population = goodNests + newNests
+
+
+def doubleBridgeMove(nest):
+    nest = nest[0]
+
+    l = len(nest)
+
+    a = randint(1, l-2)
+    b = randint(1, l-2)
+    c = randint(1, l-2)
+    d = randint(1, l-2)
+
+    nest[a], nest[c] = nest[c], nest[a]
+    nest[b], nest[d] = nest[d], nest[b]
+
+    return (nest, countVoyageLength(nest))
+
+
+def twoOptMove(nest):
+    nest = nest[0]
+
+    l = len(nest)
+
+    a = randint(1, l-2)
+    b = randint(1, l-2)
+    nest[a], nest[b] = nest[b], nest[a]
+
+    return (nest, countVoyageLength(nest))
+
+
+def leviFlight():
+    flight = math.pow(uniform(0, 1), -1/3)
+    return flight
+
+
+def generatePopulation(graph, numberOfCities):
+    population = []
+    cities = graph.copy()
+    originCity = cities[0]
+    cities.remove(cities[0])
+
+    for _ in range(numberOfCities):
+        nest = shuffleCities(cities)
+        nest.insert(0, originCity)
+        nest.append(originCity)
+        population.append((nest, countVoyageLength(nest)))
+    return population
+
+
+def countVoyageLength(voyage):
+    global distanceDictionary
+    length = 0
+    for i in range(len(voyage)):
+        if i != len(voyage) - 1:
+            length += distanceDictionary[voyage[i].name][voyage[i + 1].name]
+    return length
+
+
+def shuffleCities(cities):
+    shuffled = cities.copy()
+    citiesLength = len(shuffled)
+    for i in range(citiesLength-1):
+        j = randint(i, citiesLength-1)
+        shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+    return shuffled
 
 # wygenerowanie grafu zawierającego miasta o współrzędnych podanych w pliku
+
+
 def generateGraphFromFile(filepath):
     cities = []
     f = open(filepath, "r", encoding="utf-8")
@@ -47,7 +170,7 @@ def calculateDistancesBetweenCities(graph):
 
 
 # algorytm zachłanny obliczający trasę
-def getVoyagePath(begginingCity, graph, distanceDictionary):
+def getGreedyVoyagePath(begginingCity, graph, distanceDictionary):
     voyagePath = [begginingCity]
     citiesArray = graph.copy()
     citiesArray.remove(begginingCity)
