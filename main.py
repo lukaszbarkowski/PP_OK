@@ -1,7 +1,8 @@
 from City import City
 from helpers import (getDistanceBetweenTwoCities)
 import math
-from random import randint, uniform
+import random
+from random import randint, uniform, random
 from pprint import pprint
 population = []
 distanceDictionary = {}
@@ -70,7 +71,7 @@ def abandonNests(numberOfNests):
 
     goodNests = population[0:len(population)-numberOfNests]
 
-    newNests = generatePopulation(graph, numberOfNests)
+    newNests = generatePopulation2(population[0][0], numberOfNests)
     population = goodNests + newNests
 
 
@@ -120,6 +121,18 @@ def generatePopulation(graph, numberOfCities):
         population.append((nest, countVoyageLength(nest)))
     return population
 
+def generatePopulation2(bestPath, numberOfCities):
+    population = []
+    cities = bestPath.copy()
+    originCity = cities[0]
+    cities.remove(cities[0])
+
+    for _ in range(numberOfCities):
+        nest = random.shuffle(cities)
+        nest.insert(0, originCity)
+        nest.append(originCity)
+        population.append((nest, countVoyageLength(nest)))
+    return population
 
 def countVoyageLength(voyage):
     global distanceDictionary
