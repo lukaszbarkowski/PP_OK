@@ -6,119 +6,120 @@ from pprint import pprint
 population = []
 distanceDictionary = {}
 graph = []
+pheromones = {}
 
 
 def main():
     global distanceDictionary
     global graph
+    global pheromones
     (numberOfCities, g) = generateGraphFromFile("bayg29.txt")
     graph = g
     distanceDictionary = calculateDistancesBetweenCities(graph)
     greedyVoyagePath = getGreedyVoyagePath(graph[0], graph, distanceDictionary)
     greedyVoyagePath.append(graph[0])
     greedyVoyagePathDistance = countVoyageLength(greedyVoyagePath)
-    cuckooSearch(graph, distanceDictionary)
     print("Total greedy length:", greedyVoyagePathDistance)
 
-
-def cuckooSearch(graph, distanceDictionary):
-    global population
-    numberOfNests = len(graph)
-
-    abandonedNestsParameter = math.floor(numberOfNests - 1)
-
-    generations = 100
-
-    population = generatePopulation(graph, len(graph))
-
-    # tuple -> tuple with voyage at index 0 and distance at 1
-    population.sort(key=lambda tuple: tuple[1])
-    min = float('inf')
-    for i in range(generations):
-        res = cuckoo(abandonedNestsParameter)
-        if res < min:
-            min = res
-        print(i, min)
-    print("Total cuckoo lenght:", population[0][1])
-    # for i in population[0][0]:
-    #     print(i.name)
+    antColony(20, 200)
 
 
-def cuckoo(abandonedNestsParameter):
-    global population
-    pop = population.copy()
-    nest = pop[randint(0, len(pop)-1)]
+# TODO: count probability once per generation for all posibilities
 
-    if leviFlight() > 2:
-        nest = doubleBridgeMove(nest)
-    else:
-        nest = twoOptMove(nest)
+def antColony(ants, iterations):
+    minimalPathLength = float('inf')
+    for g in range(iterations):
+        print("Generation:", g)
+        antPaths = []
+        for i in range(ants):
+            print("Ant:", i)
+            antPath = [graph[0]]
+            for i in range(len(graph)-1):
+                actualCity = antPath[-1].name
+                distance = distanceDictionary[actualCity]
+                phero = pheromones[actualCity]
+                probabilities = getProbabilities(antPath, distance, phero)
+                if probabilities:
+                    city = getCityBasedOnProbability(probabilities)
+                    antPath.append(city)
+            antPaths.append(antPath)
 
-    randomNestIndex = randint(0, len(pop)-1)
+        addPheromones(antPaths)
+        for i in range(len(antPaths)):
+            antPaths[i].append(graph[0])
+            length = countVoyageLength(antPaths[i])
+            if(length < minimalPathLength):
+                minimalPathLength = length
 
-    if(population[randomNestIndex][1] > nest[1]):
-        population[randomNestIndex] = nest
-
-    abandonNests(abandonedNestsParameter)
-    population.sort(key=lambda tuple: tuple[1])
-    return population[0][1]
+        evaporatePheromones()
+    print(minimalPathLength)
 
 
-def abandonNests(numberOfNests):
-    global population
+def addPheromones(paths):
+    for path in paths:
+        pathLength = countVoyageLength(path)
+        for i in range(len(path)-1):
+            pheromones[path[i].name][path[i +
+                                          1].name] = pheromones[path[i].name][path[i+1].name] + 1 / pathLength
+            pheromones[path[-1].name][path[0].name] = pheromones[path[-1]
+                                                                 .name][path[0].name] + 1 / pathLength
+
+
+def getProbabilities(currentPath, distance, phero):
+
+    probabilities = {}
+    for (key, value) in distance.items():
+        if not any(x.name == key for x in currentPath):
+            counter = phero[key] * (1 / value)
+            denominator = 0
+            for (key2, value2) in distance.items():
+                denominator = denominator + phero[key2] * (1 / value2)
+            probabilities[key] = counter / denominator
+
+    return probabilities
+
+
+def getCityBasedOnProbability(probabilities):
+    ranges = {}
+    probabilitySum = 0
+    for (key, value) in probabilities.items():
+        ranges[key] = (probabilitySum, probabilitySum+value)
+        probabilitySum = probabilitySum + value
+
+    randomValue = uniform(0, probabilitySum)
+
+    for (key, value) in ranges.items():
+        (minimal, maximal) = value
+        if minimal == 0:
+            chosenCity = key
+        elif maximal == probabilitySum:
+            chosenCity = key
+        else:
+            if minimal <= randomValue <= maximal:
+                chosenCity = key
+                break
+    return graph[int(chosenCity)-1]
+
+
+def evaporatePheromones():
+    global pheromones
+    for origin in pheromones:
+        for destination in pheromones:
+            if origin is not destination:
+                pheromones[origin][destination] = pheromones[origin][destination] / 2
+
+
+def shuffleCities():
     global graph
-
-    goodNests = population[0:len(population)-numberOfNests]
-
-    newNests = generatePopulation(graph, numberOfNests)
-    population = goodNests + newNests
-
-
-def doubleBridgeMove(nest):
-    nest = nest[0]
-
-    l = len(nest)
-
-    a = randint(1, l-2)
-    b = randint(1, l-2)
-    c = randint(1, l-2)
-    d = randint(1, l-2)
-
-    nest[a], nest[c] = nest[c], nest[a]
-    nest[b], nest[d] = nest[d], nest[b]
-
-    return (nest, countVoyageLength(nest))
-
-
-def twoOptMove(nest):
-    nest = nest[0]
-
-    l = len(nest)
-
-    a = randint(1, l-2)
-    b = randint(1, l-2)
-    nest[a], nest[b] = nest[b], nest[a]
-
-    return (nest, countVoyageLength(nest))
-
-
-def leviFlight():
-    flight = math.pow(uniform(0, 1), -1/3)
-    return flight
-
-
-def generatePopulation(graph, numberOfCities):
-    population = []
-    cities = graph.copy()
-    originCity = cities[0]
-    cities.remove(cities[0])
-
-    for _ in range(numberOfCities):
-        nest = shuffleCities(cities)
-        nest.insert(0, originCity)
-        nest.append(originCity)
-        population.append((nest, countVoyageLength(nest)))
-    return population
+    g = graph.copy()
+    firstCity = graph[0]
+    g.remove(g[0])
+    for i in range(len(g)-1):
+        j = randint(i, len(g)-1)
+        g[i], g[j] = g[j], g[i]
+    g.insert(0, firstCity)
+    g.append(firstCity)
+    return g
 
 
 def countVoyageLength(voyage):
@@ -130,17 +131,7 @@ def countVoyageLength(voyage):
     return length
 
 
-def shuffleCities(cities):
-    shuffled = cities.copy()
-    citiesLength = len(shuffled)
-    for i in range(citiesLength-1):
-        j = randint(i, citiesLength-1)
-        shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-    return shuffled
-
 # wygenerowanie grafu zawierającego miasta o współrzędnych podanych w pliku
-
-
 def generateGraphFromFile(filepath):
     cities = []
     f = open(filepath, "r", encoding="utf-8")
@@ -157,14 +148,18 @@ def generateGraphFromFile(filepath):
 # funkcja zwracająca słownik, który na każdej pozycji odpowiadającej miastu przetrzymuje słownik
 # zawierający odległości od danego miasta do innych miast
 def calculateDistancesBetweenCities(graph):
+    global pheromones
     distanceDictionary = {}
     for city in graph:
         localDictionary = {}
+        localPheromones = {}
         for nearbyCity in graph:
             if city.name != nearbyCity.name:
                 localDictionary[nearbyCity.name] = getDistanceBetweenTwoCities(
                     city, nearbyCity)
+                localPheromones[nearbyCity.name] = 1
         distanceDictionary[city.name] = localDictionary
+        pheromones[city.name] = localPheromones
 
     return distanceDictionary
 
