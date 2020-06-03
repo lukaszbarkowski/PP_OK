@@ -1,7 +1,9 @@
+import random
+
 from City import City
 from helpers import (getDistanceBetweenTwoCities)
 import math
-from random import randint, uniform
+from random import randint, uniform, shuffle
 from pprint import pprint
 population = []
 distanceDictionary = {}
@@ -121,6 +123,22 @@ def shuffleCities():
     g.append(firstCity)
     return g
 
+
+def generatePopulation2(bestPath, numberOfCities):
+    population = []
+    cities = bestPath.copy()
+    originCity = cities[0]
+    cities.remove(cities[0])
+    cities.pop()
+
+
+    for _ in range(numberOfCities):
+        nest = cities.copy()
+        random.shuffle(nest)
+        nest.insert(0, originCity)
+        nest.append(originCity)
+        population.append((nest, countVoyageLength(nest)))
+    return population
 
 def countVoyageLength(voyage):
     global distanceDictionary
