@@ -1,10 +1,12 @@
 import random
-
+import os
 from City import City
 from helpers import (getDistanceBetweenTwoCities)
 import math
 from random import randint, uniform, shuffle
 from pprint import pprint
+import multiprocessing as mp
+
 population = []
 distanceDictionary = {}
 graph = []
@@ -16,36 +18,40 @@ def main():
     global graph
     global pheromones
     (numberOfCities, g) = generateGraphFromFile("bayg29.txt")
-    graph = g
-    distanceDictionary = calculateDistancesBetweenCities(graph)
-    greedyVoyagePath = getGreedyVoyagePath(graph[0], graph, distanceDictionary)
-    greedyVoyagePath.append(graph[0])
+    manager = mp.Manager()
+    graph = manager.list(g)
+    distanceDictionary = manager.dict(calculateDistancesBetweenCities(graph))
+    antColony(16, 200)
+    greedyVoyagePath = getGreedyVoyagePath(g[0], g, distanceDictionary)
+    greedyVoyagePath.append(g[0])
     greedyVoyagePathDistance = countVoyageLength(greedyVoyagePath)
     print("Total greedy length:", greedyVoyagePathDistance)
 
-    antColony(20, 200)
 
 
 # TODO: count probability once per generation for all posibilities
 
 def antColony(ants, iterations):
     minimalPathLength = float('inf')
+    pool = mp.Pool(processes=ants)
     for g in range(iterations):
         print("Generation:", g)
-        antPaths = []
-        for i in range(ants):
-            print("Ant:", i)
-            antPath = [graph[0]]
-            for i in range(len(graph)-1):
-                actualCity = antPath[-1].name
-                distance = distanceDictionary[actualCity]
-                phero = pheromones[actualCity]
-                probabilities = getProbabilities(antPath, distance, phero)
-                if probabilities:
-                    city = getCityBasedOnProbability(probabilities)
-                    antPath.append(city)
-            antPaths.append(antPath)
+        manager = mp.Manager()
+        antPaths = manager.list()
+        lock = manager.Lock()
+        antsAlive = manager.Value("antsAlive", ants, lock=lock)
 
+        # antProcesses = []
+        for i in range(ants):
+            # p = mp.Process(target=ant, args=(
+            #     graph, antPaths, antsAlive, distanceDictionary, pheromones, i))
+            # antProcesses.append(p)
+
+            pool.apply_async(ant, (graph, antPaths, antsAlive,
+                                   distanceDictionary, pheromones, lock))
+
+        while antsAlive.value > 0:
+            pass
         addPheromones(antPaths)
         for i in range(len(antPaths)):
             antPaths[i].append(graph[0])
@@ -57,31 +63,46 @@ def antColony(ants, iterations):
     print(minimalPathLength)
 
 
+def ant(graph, antPaths, antsAlive, distanceDictionary, pheromones, lock):
+    antPath = [graph[0]]
+    for i in range(len(graph)-1):
+        actualCity = antPath[-1].name
+        distance = distanceDictionary[actualCity]
+        phero = pheromones[actualCity]
+        probabilities = getProbabilities(antPath, distance, phero)
+        if probabilities:
+            city = getCityBasedOnProbability(probabilities, graph)
+            antPath.append(city)
+    antPaths.append(antPath)
+    lock.acquire()
+    antsAlive.value -= 1
+    lock.release()
+
+
 def addPheromones(paths):
     for path in paths:
         pathLength = countVoyageLength(path)
         for i in range(len(path)-1):
             pheromones[path[i].name][path[i +
                                           1].name] = pheromones[path[i].name][path[i+1].name] + 1 / pathLength
-            pheromones[path[-1].name][path[0].name] = pheromones[path[-1]
-                                                                 .name][path[0].name] + 1 / pathLength
+        pheromones[path[-1].name][path[0].name] = pheromones[path[-1]
+                                                             .name][path[0].name] + 1 / pathLength
 
 
 def getProbabilities(currentPath, distance, phero):
-
+    denominator = 0
+    for (key2, value2) in distance.items():
+        denominator = denominator + phero[key2] * (1 / value2)
     probabilities = {}
     for (key, value) in distance.items():
         if not any(x.name == key for x in currentPath):
             counter = phero[key] * (1 / value)
-            denominator = 0
-            for (key2, value2) in distance.items():
-                denominator = denominator + phero[key2] * (1 / value2)
             probabilities[key] = counter / denominator
 
     return probabilities
 
 
-def getCityBasedOnProbability(probabilities):
+def getCityBasedOnProbability(probabilities, graph):
     ranges = {}
     probabilitySum = 0
     for (key, value) in probabilities.items():
@@ -131,7 +152,6 @@ def generatePopulation2(bestPath, numberOfCities):
     cities.remove(cities[0])
     cities.pop()
 
-
     for _ in range(numberOfCities):
         nest = cities.copy()
         random.shuffle(nest)
@@ -139,6 +159,7 @@ def generatePopulation2(bestPath, numberOfCities):
         nest.append(originCity)
         population.append((nest, countVoyageLength(nest)))
     return population
+
 
 def countVoyageLength(voyage):
     global distanceDictionary
